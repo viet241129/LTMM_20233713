@@ -5,7 +5,6 @@
 
 using namespace std;
 
-// bang IP (64 phan tu, danh so tu 1..64)
 static const int bang_ip[64] = {
     58, 50, 42, 34, 26, 18, 10,  2,
     60, 52, 44, 36, 28, 20, 12,  4,
@@ -17,7 +16,6 @@ static const int bang_ip[64] = {
     63, 55, 47, 39, 31, 23, 15,  7
 };
 
-// bang IP^-1 (64 phan tu)
 static const int bang_ip_inv[64] = {
     40,  8, 48, 16, 56, 24, 64, 32,
     39,  7, 47, 15, 55, 23, 63, 31,
@@ -29,7 +27,6 @@ static const int bang_ip_inv[64] = {
     33,  1, 41,  9, 49, 17, 57, 25
 };
 
-// bang mo rong E (32 -> 48 bit)
 static const int bang_e[48] = {
     32,  1,  2,  3,  4,  5,
      4,  5,  6,  7,  8,  9,
@@ -41,7 +38,6 @@ static const int bang_e[48] = {
     28, 29, 30, 31, 32,  1
 };
 
-// hoan vi P sau S-box (32 bit)
 static const int bang_p[32] = {
     16,  7, 20, 21, 29, 12, 28, 17,
      1, 15, 23, 26,  5, 18, 31, 10,
@@ -49,7 +45,6 @@ static const int bang_p[32] = {
     19, 13, 30,  6, 22, 11,  4, 25
 };
 
-// PC-1 (64 -> 56 bit)
 static const int bang_pc1[56] = {
     57, 49, 41, 33, 25, 17,  9,
      1, 58, 50, 42, 34, 26, 18,
@@ -61,7 +56,6 @@ static const int bang_pc1[56] = {
     21, 13,  5, 28, 20, 12,  4
 };
 
-// PC-2 (56 -> 48 bit)
 static const int bang_pc2[48] = {
     14, 17, 11, 24,  1,  5,
      3, 28, 15,  6, 21, 10,
@@ -73,13 +67,11 @@ static const int bang_pc2[48] = {
     46, 42, 50, 36, 29, 32
 };
 
-// so lan dich trai tung vong
 static const int so_dich[16] = {
     1, 1, 2, 2, 2, 2, 2, 2,
     1, 2, 2, 2, 2, 2, 2, 1
 };
 
-// 8 S-box chuan DES (moi box 4 hang x 16 cot)
 static const uint8_t sbox_des[8][4][16] = {
     {
         {14, 4,13, 1, 2,15,11, 8, 3,10, 6,12, 5, 9, 0, 7},
@@ -131,7 +123,6 @@ static const uint8_t sbox_des[8][4][16] = {
     }
 };
 
-// lay bit thu pos (1..64, MSB = 1)
 uint8_t lay_bit(const uint8_t* mang, int pos) {
     int idx = (pos - 1) / 8;
     int shift = 7 - ((pos - 1) % 8);
@@ -152,7 +143,6 @@ void hoan_vi(const uint8_t* vao, uint8_t* ra, const int* bang, int so_bit) {
     }
 }
 
-// dich trai mang 28-bit (luu trong 4 byte, dung 28 bit cao)
 void dich_trai_28(uint8_t half[4], int n) {
     for (int step = 0; step < n; ++step) {
         uint8_t msb = (half[0] >> 7) & 1;
@@ -209,7 +199,7 @@ void ham_f(const uint8_t r32[4], const uint8_t k48[6], uint8_t out32[4]) {
 
         int hang = (b0 << 1) | b5;
         int cot = (b1 << 3) | (b2 << 2) | (b3 << 1) | b4;
-        uint8_t val = sbox_des[b][hang][cot]; // 0..15
+        uint8_t val = sbox_des[b][hang][cot];
 
         int out_bit = b * 4;
         gan_bit(s_out16, out_bit + 1, (val >> 3) & 1);
@@ -236,6 +226,13 @@ int main() {
     uint8_t subkey[16][6];
     sinh_khoa_con(key, subkey);
 
+    cout << "=== KHOA CON 16 VONG (48-BIT) ===\n";
+    for (int i = 0; i < 16; ++i) {
+        char nhan[24];
+        snprintf(nhan, sizeof(nhan), "K%02d", i + 1);
+        in_hex(nhan, subkey[i], 6);
+    }
+
     uint8_t ip_out[8];
     hoan_vi(pt, ip_out, bang_ip, 64);
 
@@ -243,6 +240,7 @@ int main() {
     memcpy(l, ip_out, 4);
     memcpy(r, ip_out + 4, 4);
 
+    cout << "\n=== TRANG THAI TUNG VONG DES ===\n";
     in_hex("Plaintext ", pt, 8);
     in_hex("After IP  ", ip_out, 8);
 
@@ -253,24 +251,23 @@ int main() {
         memcpy(l, r, 4);
         memcpy(r, r_moi, 4);
 
-        if (vong == 0 || vong == 15) {
-            uint8_t lr[8];
-            memcpy(lr, l, 4);
-            memcpy(lr + 4, r, 4);
-            char nhan[32];
-            snprintf(nhan, sizeof(nhan), "Round %2d (L,R)", vong + 1);
-            in_hex(nhan, lr, 8);
-        }
+        uint8_t lr[8];
+        memcpy(lr, l, 4);
+        memcpy(lr + 4, r, 4);
+        char nhan[32];
+        snprintf(nhan, sizeof(nhan), "Round %2d (L,R)", vong + 1);
+        in_hex(nhan, lr, 8);
     }
 
-    // loi co y: quen doi R va L truoc khi ap dung IP^-1
-    uint8_t truoc_ip_inv[8];
-    memcpy(truoc_ip_inv, l, 4);
-    memcpy(truoc_ip_inv + 4, r, 4);
+    // da sua: ghep R16 truoc, L16 sau roi moi qua IP^-1
+    uint8_t sau_swap[8];
+    memcpy(sau_swap, r, 4);
+    memcpy(sau_swap + 4, l, 4);
+    in_hex("32-bit swap", sau_swap, 8);
 
     uint8_t ct[8];
-    hoan_vi(truoc_ip_inv, ct, bang_ip_inv, 64);
-    in_hex("Ciphertext (chua swap cuoi)", ct, 8);
-    cout << "Ky vong DES: 85E813540F0AB405\n";
+    hoan_vi(sau_swap, ct, bang_ip_inv, 64);
+    in_hex("Ciphertext DES", ct, 8);
+    cout << "Ky vong DES   : 85E813540F0AB405\n";
     return 0;
 }
