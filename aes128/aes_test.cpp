@@ -4,7 +4,6 @@
 
 using namespace std;
 
-// bang S-box chuan AES
 static const uint8_t sbox_chuan[256] = {
     0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
     0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
@@ -24,9 +23,14 @@ static const uint8_t sbox_chuan[256] = {
     0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
 };
 
-// nhan 02 tren GF(2^8) - tam thoi dich trai thoi, chua xu ly bit cao
+// sua loi nhan 2 tren GF(2^8): co MSB=1 thi XOR 0x1B
 uint8_t nhan_2(uint8_t x) {
-    return (uint8_t)(x << 1); // nho check lai khi bit dau la 1
+    uint8_t bit_cao = x & 0x80;
+    uint8_t kq = (uint8_t)(x << 1);
+    if (bit_cao) {
+        kq ^= 0x1B;
+    }
+    return kq;
 }
 
 uint8_t nhan_3(uint8_t x) {
@@ -61,7 +65,7 @@ void tinh_w4_khoa_0(uint8_t w4[4]) {
         sbox_chuan[rot[0]], sbox_chuan[rot[1]],
         sbox_chuan[rot[2]], sbox_chuan[rot[3]]
     };
-    // tam thoi chua cong rcon[1]
+    // van chua cong rcon[1]
     for (int i = 0; i < 4; ++i) {
         w4[i] = w0[i] ^ sub[i];
     }
@@ -77,7 +81,7 @@ int main() {
     uint8_t ket_qua_mc[4][4];
     in_ma_tran("Trang thai vao MixColumns (vo)", ma_tran_vo);
     mix_cols_vo(ma_tran_vo, ket_qua_mc);
-    in_ma_tran("Trang thai sau MixColumns (chua sua loi)", ket_qua_mc);
+    in_ma_tran("Trang thai sau MixColumns", ket_qua_mc);
 
     uint8_t w4[4];
     tinh_w4_khoa_0(w4);
