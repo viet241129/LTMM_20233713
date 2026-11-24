@@ -23,7 +23,6 @@ static const uint8_t sbox_chuan[256] = {
     0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
 };
 
-// sua loi nhan 2 tren GF(2^8): co MSB=1 thi XOR 0x1B
 uint8_t nhan_2(uint8_t x) {
     uint8_t bit_cao = x & 0x80;
     uint8_t kq = (uint8_t)(x << 1);
@@ -65,9 +64,9 @@ void tinh_w4_khoa_0(uint8_t w4[4]) {
         sbox_chuan[rot[0]], sbox_chuan[rot[1]],
         sbox_chuan[rot[2]], sbox_chuan[rot[3]]
     };
-    // van chua cong rcon[1]
+    uint8_t rcon1[4] = {0x01, 0x00, 0x00, 0x00}; // quen cong cai nay o ban dau
     for (int i = 0; i < 4; ++i) {
-        w4[i] = w0[i] ^ sub[i];
+        w4[i] = w0[i] ^ sub[i] ^ rcon1[i];
     }
 }
 
@@ -85,7 +84,7 @@ int main() {
 
     uint8_t w4[4];
     tinh_w4_khoa_0(w4);
-    cout << "--- w[4] khi khoa = 0 (chua cong Rcon) ---\n";
+    cout << "--- w[4] khi khoa = 0 ---\n";
     for (int i = 0; i < 4; ++i) {
         cout << hex << uppercase << setw(2) << setfill('0') << (int)w4[i] << " ";
     }
