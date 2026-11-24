@@ -23,6 +23,10 @@ static const uint8_t sbox_chuan[256] = {
     0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
 };
 
+static const uint8_t rcon_bang[11] = {
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36
+};
+
 uint8_t nhan_2(uint8_t x) {
     uint8_t bit_cao = x & 0x80;
     uint8_t kq = (uint8_t)(x << 1);
@@ -46,48 +50,160 @@ void in_ma_tran(const char* nhan, uint8_t m[4][4]) {
     }
 }
 
-void mix_cols_vo(uint8_t vao[4][4], uint8_t ra[4][4]) {
+void in_hex_16(const char* nhan, const uint8_t b[16]) {
+    cout << "--- " << nhan << " ---\n";
+    for (int i = 0; i < 16; ++i) {
+        cout << hex << uppercase << setw(2) << setfill('0') << (int)b[i];
+    }
+    cout << "\n";
+}
+
+// chuyen mang 16 byte theo thu tu cot (nhu chuan AES) sang ma tran 4x4 [hang][cot]
+void nap_trang_thai(const uint8_t in[16], uint8_t st[4][4]) {
     for (int c = 0; c < 4; ++c) {
-        uint8_t s0 = vao[0][c], s1 = vao[1][c], s2 = vao[2][c], s3 = vao[3][c];
-        ra[0][c] = nhan_2(s0) ^ nhan_3(s1) ^ s2 ^ s3;
-        ra[1][c] = s0 ^ nhan_2(s1) ^ nhan_3(s2) ^ s3;
-        ra[2][c] = s0 ^ s1 ^ nhan_2(s2) ^ nhan_3(s3);
-        ra[3][c] = nhan_3(s0) ^ s1 ^ s2 ^ nhan_2(s3);
+        for (int r = 0; r < 4; ++r) {
+            st[r][c] = in[4 * c + r];
+        }
+    }
+}
+
+void xuat_trang_thai(const uint8_t st[4][4], uint8_t out[16]) {
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            out[4 * c + r] = st[r][c];
+        }
+    }
+}
+
+void thay_the_byte(uint8_t st[4][4]) {
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            st[r][c] = sbox_chuan[st[r][c]];
+        }
+    }
+}
+
+// loi co y: hang 2 dang dich 1 thay vi 2
+void dich_hang(uint8_t st[4][4]) {
+    uint8_t tam[4];
+    // hang 1: dich trai 1
+    for (int c = 0; c < 4; ++c) tam[c] = st[1][(c + 1) % 4];
+    for (int c = 0; c < 4; ++c) st[1][c] = tam[c];
+
+    // hang 2: dang bi nham dich 1 (chuan la 2)
+    for (int c = 0; c < 4; ++c) tam[c] = st[2][(c + 1) % 4];
+    for (int c = 0; c < 4; ++c) st[2][c] = tam[c];
+
+    // hang 3: dich trai 3
+    for (int c = 0; c < 4; ++c) tam[c] = st[3][(c + 3) % 4];
+    for (int c = 0; c < 4; ++c) st[3][c] = tam[c];
+}
+
+void tron_cot(uint8_t st[4][4]) {
+    for (int c = 0; c < 4; ++c) {
+        uint8_t s0 = st[0][c], s1 = st[1][c], s2 = st[2][c], s3 = st[3][c];
+        st[0][c] = nhan_2(s0) ^ nhan_3(s1) ^ s2 ^ s3;
+        st[1][c] = s0 ^ nhan_2(s1) ^ nhan_3(s2) ^ s3;
+        st[2][c] = s0 ^ s1 ^ nhan_2(s2) ^ nhan_3(s3);
+        st[3][c] = nhan_3(s0) ^ s1 ^ s2 ^ nhan_2(s3);
+    }
+}
+
+void sinh_khoa_mo_rong(const uint8_t khoa[16], uint8_t w[44][4]) {
+    for (int i = 0; i < 4; ++i) {
+        w[i][0] = khoa[4 * i];
+        w[i][1] = khoa[4 * i + 1];
+        w[i][2] = khoa[4 * i + 2];
+        w[i][3] = khoa[4 * i + 3];
+    }
+    for (int i = 4; i < 44; ++i) {
+        uint8_t tam[4] = {w[i - 1][0], w[i - 1][1], w[i - 1][2], w[i - 1][3]};
+        if (i % 4 == 0) {
+            uint8_t rot[4] = {tam[1], tam[2], tam[3], tam[0]};
+            tam[0] = sbox_chuan[rot[0]] ^ rcon_bang[i / 4];
+            tam[1] = sbox_chuan[rot[1]];
+            tam[2] = sbox_chuan[rot[2]];
+            tam[3] = sbox_chuan[rot[3]];
+        }
+        for (int b = 0; b < 4; ++b) {
+            w[i][b] = w[i - 4][b] ^ tam[b];
+        }
+    }
+}
+
+void cong_khoa_vong(uint8_t st[4][4], uint8_t w[44][4], int vong) {
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            st[r][c] ^= w[4 * vong + c][r];
+        }
     }
 }
 
 void tinh_w4_khoa_0(uint8_t w4[4]) {
-    uint8_t w0[4] = {0, 0, 0, 0};
-    uint8_t w3[4] = {0, 0, 0, 0};
-    uint8_t rot[4] = {w3[1], w3[2], w3[3], w3[0]};
-    uint8_t sub[4] = {
-        sbox_chuan[rot[0]], sbox_chuan[rot[1]],
-        sbox_chuan[rot[2]], sbox_chuan[rot[3]]
-    };
-    uint8_t rcon1[4] = {0x01, 0x00, 0x00, 0x00}; // quen cong cai nay o ban dau
-    for (int i = 0; i < 4; ++i) {
-        w4[i] = w0[i] ^ sub[i] ^ rcon1[i];
-    }
+    uint8_t khoa0[16] = {0};
+    uint8_t w[44][4];
+    sinh_khoa_mo_rong(khoa0, w);
+    for (int i = 0; i < 4; ++i) w4[i] = w[4][i];
 }
 
 int main() {
+    // 1. Test vector trong vo
     uint8_t ma_tran_vo[4][4] = {
         {0x63, 0x63, 0x63, 0x63},
         {0x63, 0x63, 0x63, 0x63},
         {0x63, 0x82, 0x63, 0x63},
         {0x82, 0x63, 0x63, 0x63}
     };
-    uint8_t ket_qua_mc[4][4];
-    in_ma_tran("Trang thai vao MixColumns (vo)", ma_tran_vo);
-    mix_cols_vo(ma_tran_vo, ket_qua_mc);
-    in_ma_tran("Trang thai sau MixColumns", ket_qua_mc);
+    uint8_t kq_mc[4][4];
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 4; ++c) kq_mc[r][c] = ma_tran_vo[r][c];
+    tron_cot(kq_mc);
+    in_ma_tran("Vo - Sau MixColumns", kq_mc);
 
     uint8_t w4[4];
     tinh_w4_khoa_0(w4);
-    cout << "--- w[4] khi khoa = 0 ---\n";
+    cout << "--- Vo - w[4] khi khoa = 0 ---\n";
     for (int i = 0; i < 4; ++i) {
         cout << hex << uppercase << setw(2) << setfill('0') << (int)w4[i] << " ";
     }
-    cout << "\n";
+    cout << "\n\n";
+
+    // 2. Test vector slide AES-128
+    uint8_t pt[16] = {
+        0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+        0xfe,0xdc,0xba,0x98,0x76,0x54,0x32,0x10
+    };
+    uint8_t key[16] = {
+        0x0f,0x15,0x71,0xc9,0x47,0xd9,0xe8,0x59,
+        0x0c,0xb7,0xad,0xd6,0xaf,0x7f,0x67,0x98
+    };
+    uint8_t w[44][4];
+    sinh_khoa_mo_rong(key, w);
+
+    uint8_t st[4][4];
+    nap_trang_thai(pt, st);
+    in_ma_tran("AES-128 Trang thai dau (Plaintext)", st);
+    cong_khoa_vong(st, w, 0);
+    in_ma_tran("AES-128 Sau AddRoundKey vong 0", st);
+
+    for (int round = 1; round <= 10; ++round) {
+        thay_the_byte(st);
+        dich_hang(st);
+        if (round < 10) {
+            tron_cot(st);
+        }
+        cong_khoa_vong(st, w, round);
+
+        if (round == 1 || round == 10) {
+            char nhan[64];
+            snprintf(nhan, sizeof(nhan), "AES-128 Trang thai cuoi vong %d", round);
+            in_ma_tran(nhan, st);
+        }
+    }
+
+    uint8_t ct[16];
+    xuat_trang_thai(st, ct);
+    in_hex_16("AES-128 Ciphertext (chua sua ShiftRows)", ct);
+    cout << "Ky vong slide: FF0B844A0853BF7C6934AB4364148FB9\n";
     return 0;
 }
